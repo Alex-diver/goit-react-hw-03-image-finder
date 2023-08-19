@@ -10,8 +10,3 @@ export const Error = styled.div`
   text-align: center;
   margin-top: 30px;
 `;
-
-export const ErrorText = styled.h1`
-  font-size: 36px;
-  color: #5b6988;
-`;

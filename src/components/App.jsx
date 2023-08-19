@@ -1,27 +1,25 @@
-// import { nanoid } from 'nanoid';
-import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 import { Component } from 'react';
 
-import { AppStyled, Error, ErrorText } from './App.styled';
+import { AppStyled, Error } from './App.styled';
 import { AllImages } from '../api';
 import { Searchbar } from './Searchbar/Searchbar';
-import { ImagesGallery } from './ImageGallery/ImageGallery';
-import { Modal } from './Modal/Mobal';
+import { ImageGallery, scaleHits } from './ImageGallery/ImageGallery';
 import { Button } from './Button/Button';
 import { Loader } from './Loader/Loader';
 
-// import { GlobalStyle } from './GlobalStyle';
-
 export class App extends Component {
+  abortCtrl;
+
   state = {
-    searchName: '',
-    gallery: [],
-    largeImageURL: '',
-    isLoading: false,
-    showModal: false,
-    page: '',
+    images: [],
+    query: '',
+    currentPage: 1,
     error: null,
+    isLoading: false,
+    isLastPage: false,
   };
 
   componentDidUpdate(prevProps, prevState) {
@@ -34,93 +32,90 @@ export class App extends Component {
   }
 
   getImages = async () => {
-    const { searchName, page } = this.state;
+    const { query, currentPage } = this.state;
 
-    if (searchName.trim() === '') {
-      this.setState({ gallery: [] });
-      return Notify.error(
-        'Sorry, there are no images matching your search query. Please try again.'
-      );
+    if (this.abortCtrl) {
+      this.abortCtrl.abort();
     }
+
+    this.abortCtrl = new AbortController();
 
     try {
-      this.toggleLoading();
-      const response = await AllImages(searchName, page);
-      const gallery = response.data.hits;
+      this.setState({ isLoading: true });
 
-      if (gallery.length === 0 && page === 1) {
-        this.setState({ gallery: [] });
-        return Notify.info(`No images found for ${searchName}`);
+      const data = await AllImages(query, currentPage, this.abortCtrl.signal);
+
+      if (data.hits.length === 0) {
+        return toast.info(
+          'Sorry, there are no images matching your search query. Please try again.',
+          {
+            position: toast.POSITION.TOP_RIGHT,
+          }
+        );
+      } else if (currentPage === 1) {
+        toast.success('We found some images for you!', {
+          position: toast.POSITION.TOP_RIGHT,
+        });
       } else {
-        this.setState(prevState => ({
-          gallery: page === 1 ? gallery : [...prevState.gallery, ...gallery],
-          error: null,
-        }));
+        toast.success('We found some more images for you!', {
+          position: toast.POSITION.TOP_RIGHT,
+        });
       }
+
+      const scaledHits = scaleHits(data.hits);
+
+      this.setState(prevState => ({
+        images: [...prevState.images, ...scaledHits],
+        isLastPage:
+          prevState.images.length + scaledHits.length >= data.totalHits,
+        error: null,
+      }));
     } catch (error) {
-      this.setState({ error });
+      if (error.code !== 'ERR_CANCELED') {
+        this.setState({ error: error.message });
+      }
     } finally {
-      this.toggleLoading();
+      this.setState({ isLoading: false });
     }
   };
 
-  handleSubmit = event => {
-    event.preventDefault();
-    const { searchName } = this.state;
-    const imgName = event.target[0].value.toLowerCase();
-
-    if (searchName === imgName) {
-      return Notify.info(
-        `Sorry, there are no images ${searchName} images.Please try again.`
-      );
-    }
-    this.setState({
-      searchName: imgName,
-      page: 1,
-    });
-  };
   loadMore = () => {
     this.setState(prevState => ({
-      page: prevState.page + 1,
+      currentPage: prevState.currentPage + 1,
     }));
   };
 
-  toggleLoading = () => {
-    this.setState(({ isLoading }) => ({
-      isLoading: !isLoading,
-    }));
-  };
+  handleSearchSubmit = query => {
+    if (this.state.query === query) {
+      return;
+    }
 
-  toggleModal = largeImageURL => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-      largeImageURL: largeImageURL,
-    }));
+    this.setState({
+      query,
+      currentPage: 1,
+      images: [],
+      error: null,
+      isLastPage: false,
+    });
   };
 
   render() {
-    // const { images, isLoading, error, isLastPage } = this.state;
-    const { isLoading, gallery, largeImageURL, showModal, error } = this.state;
-    const showLoadMoreButton = gallery.length > 0;
+    const { images, isLoading, error, isLastPage } = this.state;
 
     return (
       <AppStyled>
+        <ToastContainer autoClose={2500} />
         <Searchbar onSubmit={this.handleSearchSubmit} />
-        {isLoading && <Loader toggleLoading={this.toggleLoading} />}
-        {error && (
-          <Error>
-            <ErrorText>"{error}"</ErrorText>
-          </Error>
-        )}
-        <ImagesGallery gallery={gallery} toggleModal={this.toggleModal} />
-        {showModal && (
-          <Modal largeImageURL={largeImageURL} toggleModal={this.toggleModal} />
-        )}
-        {isLoading && <Loader />}
-        {showLoadMoreButton && <Button onClick={this.loadMore} />}
 
-        {/* <Credits />
-        <ToastContainer autoClose={3000} pauseOnHover={false} theme="colored" /> */}
+        {error && <Error>Error: {error}</Error>}
+        {isLoading && <Loader toggleLoading={this.toggleLoading} />}
+
+        <ImageGallery images={images} />
+        {isLoading && <Loader />}
+
+        {!isLoading && images.length > 0 && !isLastPage && (
+          <Button onClick={this.loadMore} />
+        )}
       </AppStyled>
     );
   }

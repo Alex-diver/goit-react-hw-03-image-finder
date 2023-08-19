@@ -1,36 +1,45 @@
-import { Component } from 'react';
+import ReactModal from 'react-modal';
 
-import { ModalStyled, Overlay, Img } from './Modal.styled';
+import { disableBodyScroll, enableBodyScroll } from 'body-scroll-lock';
 
-export class Modal extends Component {
-  componentDidMount() {
-    window.addEventListener('keydown', this.handleKeyDown);
-  }
+const customStyles = {
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
+    overflow: 'auto',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 1200,
+  },
+  content: {
+    backgroundColor: 'transparent',
+    border: 'none',
+    top: '50%',
+    left: '50%',
+    right: 'auto',
+    bottom: 'auto',
+    marginRight: '-50%',
+    transform: 'translate(-50%, -50%)',
+  },
+};
 
-  componentWillUnmount() {
-    window.removeEventListener('keydown', this.handleKeyDown);
-  }
+ReactModal.setAppElement('#root');
 
-  handleKeyDown = event => {
-    if (event.code === 'Escape') {
-      this.props.toggleModal();
-    }
-  };
-
-  handleBackdropClick = event => {
-    if (event.currentTarget === event.target) {
-      this.props.toggleModal();
-    }
-  };
-
-  render() {
-    const { largeImageURL } = this.props;
-    return (
-      <Overlay onClick={this.handleBackdropClick}>
-        <ModalStyled>
-          <Img src={largeImageURL} width="800" height="500" />
-        </ModalStyled>
-      </Overlay>
-    );
-  }
-}
+export const Modal = ({ isOpen, largeImageURL, tags, onClose }) => {
+  return (
+    <ReactModal
+      style={customStyles}
+      isOpen={isOpen}
+      onRequestClose={onClose}
+      onAfterOpen={() => disableBodyScroll(document)}
+      onAfterClose={() => enableBodyScroll(document)}
+    >
+      <img src={largeImageURL} alt={tags} />
+    </ReactModal>
+  );
+};

@@ -1,4 +1,3 @@
-// @import -normalize; /* bring in normalize.css styles */
 import { createGlobalStyle } from 'styled-components';
 import 'modern-normalize';
 
